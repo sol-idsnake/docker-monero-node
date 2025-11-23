@@ -1,0 +1,14 @@
+bandwidth = 2048
+datadir = /var/lib/i2pd
+ipv6 = false
+log = false
+
+[socksproxy]
+address = 0.0.0.0
+enabled = true
+port = 4447
+
+[httpproxy]
+address = 0.0.0.0
+enabled = true
+port = 4444

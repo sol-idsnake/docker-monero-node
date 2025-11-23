@@ -1,0 +1,70 @@
+services:
+  i2p:
+    build:
+      context: .
+      dockerfile: dockerfiles/i2p
+    container_name: monerod_i2p
+    networks:
+      tor_net:
+        ipv4_address: 172.31.255.251
+    restart: unless-stopped
+
+  monerod:
+    build:
+      args:
+        MONERO_VERSION: ${MONERO_VERSION}
+      context: .
+      dockerfile: dockerfiles/monerod
+    command:
+      - --ban-list=/ban_list.txt
+      - --confirm-external-bind
+      - --data-dir=/var/lib/monero
+      - --enable-dns-blocklist
+      - --log-level=0
+      - --non-interactive
+      - --p2p-bind-ip=0.0.0.0
+      - --p2p-bind-port=18080
+      - --proxy=172.31.255.250:9050
+      - --restricted-rpc
+      - --rpc-bind-ip=127.0.0.1
+      - --rpc-bind-port=18089
+      - --rpc-restricted-bind-ip=0.0.0.0
+      - --rpc-restricted-bind-port=18081
+      - --rpc-ssl=disabled
+      - --tx-proxy=i2p,172.31.255.251:4447,disable_noise,24
+      - --tx-proxy=tor,172.31.255.250:9050,disable_noise,24
+    container_name: monerod
+    depends_on:
+      i2p:
+        condition: service_started
+      tor:
+        condition: service_started
+    networks:
+      tor_net:
+        ipv4_address: 172.31.255.10
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-./data}:/var/lib/monero
+      - tor:/var/lib/tor:ro
+
+  tor:
+    build:
+      context: .
+      dockerfile: dockerfiles/tor
+    container_name: monerod_tor
+    networks:
+      tor_net:
+        ipv4_address: 172.31.255.250
+    restart: unless-stopped
+    volumes:
+      - tor:/var/lib/tor
+
+networks:
+  tor_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.31.255.0/24"
+
+volumes:
+  tor:

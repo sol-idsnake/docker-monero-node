@@ -1,0 +1,10 @@
+FROM purplei2p/i2pd:latest-release
+
+USER root
+
+COPY dockerfiles/i2p-config /etc/i2pd/i2pd.conf
+
+RUN mkdir -p /var/lib/i2pd && chown -R i2pd /var/lib/i2pd /etc/i2pd
+USER i2pd
+
+CMD ["--conf", "/etc/i2pd/i2pd.conf"]

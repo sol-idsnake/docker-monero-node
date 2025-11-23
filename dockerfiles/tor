@@ -1,0 +1,33 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates wget gnupg && \
+    \
+    # Add Tor GPG key
+    wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc \
+    | gpg --dearmor \
+    | tee /usr/share/keyrings/deb.torproject.org-keyring.gpg >/dev/null && \
+    \
+    # Add Tor repository
+    echo "deb [signed-by=/usr/share/keyrings/deb.torproject.org-keyring.gpg] https://deb.torproject.org/torproject.org jammy main" \
+    > /etc/apt/sources.list.d/tor.list && \
+    \
+    # Update again because we now have a new repo
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    tor \
+    deb.torproject.org-keyring && \
+    \
+    apt-get purge -y wget gnupg && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY dockerfiles/tor-config /etc/tor/torrc
+
+EXPOSE 9050
+
+USER debian-tor
+CMD ["tor"]

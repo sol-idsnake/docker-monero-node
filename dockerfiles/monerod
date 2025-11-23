@@ -1,0 +1,55 @@
+FROM ubuntu:22.04 AS downloader
+
+ARG MONERO_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /opt/monero
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget tar bzip2 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN test -n "${MONERO_VERSION}" || (echo "MONERO_VERSION is required" && exit 1) \
+    && ARCHIVE_VERSION="v${MONERO_VERSION#v}" \
+    && ARCHIVE_NAME="monero-linux-armv8-${ARCHIVE_VERSION}.tar.bz2" \
+    && wget -qO "/tmp/${ARCHIVE_NAME}" "https://downloads.getmonero.org/cli/${ARCHIVE_NAME}" \
+    && wget -qO /tmp/hashes.txt "https://www.getmonero.org/downloads/hashes.txt" \
+    && EXPECTED_SHA=$(grep " ${ARCHIVE_NAME}$" /tmp/hashes.txt | awk '{print $1}') \
+    && if [ -z "${EXPECTED_SHA}" ]; then echo "Expected SHA not found for ${ARCHIVE_NAME}"; exit 1; fi \
+    && ACTUAL_SHA=$(sha256sum "/tmp/${ARCHIVE_NAME}" | awk '{print $1}') \
+    && if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then echo "SHA256 mismatch"; exit 1; fi \
+    && mkdir -p /opt/monero && tar -xjf "/tmp/${ARCHIVE_NAME}" -C /opt/monero --strip-components=1 \
+    && MONEROD_BIN="$(find /opt/monero -maxdepth 2 -type f -name monerod | head -n 1)" \
+    && if [ -z "${MONEROD_BIN}" ]; then echo "monerod not found after extraction"; exit 1; fi \
+    && if [ "${MONEROD_BIN}" != "/opt/monero/monerod" ]; then cp "${MONEROD_BIN}" /opt/monero/monerod; fi \
+    && chmod +x /opt/monero/monerod \
+    && rm -f "/tmp/${ARCHIVE_NAME}" /tmp/hashes.txt
+
+RUN wget -qO /tmp/ban_list.txt "https://raw.githubusercontent.com/Boog900/monero-ban-list/main/ban_list.txt"
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY --from=downloader /tmp/ban_list.txt /ban_list.txt
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libzmq5 libunbound8 libsodium23 libunwind8 libboost-system1.74.0 \
+    libboost-chrono1.74.0 libboost-thread1.74.0 libboost-filesystem1.74.0 \
+    libboost-program-options1.74.0 libboost-regex1.74.0 libboost-serialization1.74.0 \
+    libboost-date-time1.74.0 libboost-locale1.74.0 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN useradd -r -m -d /var/lib/monero -s /usr/sbin/nologin monero && \
+    mkdir -p /var/lib/monero && \
+    chown -R monero:monero /var/lib/monero
+
+WORKDIR /var/lib/monero
+
+COPY --from=downloader /opt/monero/monerod /usr/local/bin/monerod
+COPY dockerfiles/monerod-entrypoint.sh /usr/local/bin/monerod-entrypoint.sh
+RUN chmod +x /usr/local/bin/monerod-entrypoint.sh
+
+EXPOSE 18080 18081
+ENTRYPOINT ["/usr/local/bin/monerod-entrypoint.sh"]
