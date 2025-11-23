@@ -12,12 +12,11 @@ This stack runs a Monero daemon behind Tor (and I2P) with only the restricted RP
 
 ## Key configuration choices
 
-- Restricted RPC only: bound to `0.0.0.0:18081` inside the network; no host ports published. Use the logged onion to reach it.
-- Core (unrestricted) RPC is loopback-only on `127.0.0.1:18089` because monerod requires a core RPC listener for the restricted RPC to start; it is not exposed.
-- Outbound privacy: P2P proxy flags for Tor (`172.31.255.250:9050`) and I2P (`172.31.255.251:4447`) to hide your IP and reach Tor/I2P peers.
-- Data dir: host `${DATA_DIR:-./data}` mounted at `/var/lib/monero`.
-- Safety flags: DNS blocklist enabled, external binds confirmed, non-interactive mode, ban list mounted at `/ban_list.txt`.
-- Removed as bloat for this use case: public unrestricted RPC, ZMQ bindings/port, unused env vars.
+- Restricted RPC only: limits surface area to wallet-safe methods; no host ports published.
+- Core RPC loopback: monerod needs a core RPC listener to start the restricted RPC; bound to `127.0.0.1:18089` so it stays internal.
+- Outbound privacy/reachability: Tor (`172.31.255.250:9050`) and I2P (`172.31.255.251:4447`) proxies hide your IP and let you talk to Tor/I2P peers; keep I2P for resilience.
+- Chain data persisted: `${DATA_DIR:-./data}` is mounted at `/var/lib/monero` so the blockchain survives container rebuilds.
+- Hygiene flags: DNS blocklist + ban list to avoid known-bad peers; non-interactive + confirm-external-bind to prevent prompts or accidental exposure.
 
 ## Running
 
